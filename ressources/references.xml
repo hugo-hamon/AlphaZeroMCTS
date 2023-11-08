@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<references>
+    <reference>
+        <name>Alpha Zero &#38; MCTS</name>
+        <description>Vidéo explicative sur le fonctionnement de Alpha Zero avec MCTS</description>
+        <url>https://youtu.be/62nq4Zsn8vc?feature=shared</url>
+        <github> https://github.com/JoshVarty/AlphaZeroSimple </github>
+    </reference>
+</references>
