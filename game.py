@@ -66,3 +66,8 @@ class Connect2Game:
     def get_canonical_board(self, board: np.ndarray, player: int) -> np.ndarray:
         """Return the canonical board for the given player"""
         return player * board
+    
+    def display(self, board: np.ndarray) -> None:
+        """Display the board"""
+        print(f"Board: {board}")
+        print(f"Moves: {list(range(self.columns))}")

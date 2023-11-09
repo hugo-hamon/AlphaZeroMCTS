@@ -8,12 +8,7 @@ import math
 def ucb_score(parent: Node, child: Node) -> float:
     """The score for an action that would transition between the parent and child. """
     prior_score = child.prior * math.sqrt(parent.visit_count) / (child.visit_count + 1)
-    if child.visit_count > 0:
-        # The value is from the perspective of the opposing player
-        value_score = -child.value()
-    else:
-        value_score = 0
-
+    value_score = -child.value() if child.visit_count > 0 else 0
     return value_score + prior_score
 
 
@@ -23,7 +18,7 @@ class Node:
         self.visit_count = 0
         self.to_play = to_play
         self.prior = prior
-        self.value_sum = 0
+        self.value_sum = 0.
         self.children: dict[int, Node] = {}
         self.state = None
 
@@ -33,25 +28,21 @@ class Node:
     
     def value(self) -> float:
         """Return the value of the node"""
-        if self.visit_count == 0:
-            return 0
-        return self.value_sum / self.visit_count
+        return 0 if self.visit_count == 0 else self.value_sum / self.visit_count
     
     def select_action(self, temperature: float) -> int:
         """Select action according to the visit count distribution and the temperature."""
         visit_counts = np.array([child.visit_count for child in self.children.values()])
-        actions = [action for action in self.children.keys()]
+        actions = list(self.children.keys())
         if temperature == 0:
-            action = actions[np.argmax(visit_counts)]
+            return actions[np.argmax(visit_counts)]
         elif temperature == float("inf"):
-            action = np.random.choice(actions)
+            return np.random.choice(actions)
         else:
             # Paper appendix Data Generation
             visit_count_distribution = visit_counts ** (1 / temperature)
             visit_count_distribution = visit_count_distribution / sum(visit_count_distribution)
-            action = np.random.choice(actions, p=visit_count_distribution)
-
-        return action
+            return np.random.choice(actions, p=visit_count_distribution)
     
     def select_child(self) -> tuple[int, Optional[Node]]:
         """Select the child with the highest UCB score."""
@@ -89,24 +80,27 @@ class MCTS:
         root = Node(0, to_play)
 
         # EXPAND root
-        p_action_probs, value = model.predict(state)
+        action_probs, value = model.predict(state)
         valid_moves = self.game.get_valid_moves(state)
-        p_action_probs = p_action_probs * valid_moves  # mask invalid moves
-        action_probs = p_action_probs / np.sum(p_action_probs)
+        action_probs = action_probs * valid_moves  # mask invalid moves
+        action_probs /= np.sum(action_probs).astype(float)
         root.expand(state, action_probs, to_play)
 
         for _ in range(self.args['num_simulations']):
             node = root
-            search_path = [node]
+            search_path: list[Node] = [node]
+            action = -1
 
             # SELECT
             while node.expanded():
                 action, node = node.select_child()
                 if node is None:
-                    break
+                    raise ValueError("Node is None")
                 search_path.append(node)
 
             parent = search_path[-2]
+            if parent.state is None:
+                raise ValueError("Parent state is None")
             state = parent.state
             # Now we're at a leaf node and we would like to expand
             # Players always play from their own perspective
@@ -122,14 +116,15 @@ class MCTS:
                 action_probs, value = model.predict(next_state)
                 valid_moves = self.game.get_valid_moves(next_state)
                 action_probs = action_probs * valid_moves  # mask invalid moves
-                action_probs /= np.sum(action_probs)
-                node.expand(next_state, parent.to_play * -1, action_probs)
-
-            self.backpropagate(search_path, value, parent.to_play * -1)
+                action_probs /= np.sum(action_probs).astype(float)
+                node.expand(next_state, action_probs, parent.to_play * -1)
+            if value is None:
+                raise ValueError("Value is None")
+            self.backpropagate(search_path, float(value), parent.to_play * -1)
 
         return root
 
-    def backpropagate(self, search_path, value, to_play):
+    def backpropagate(self, search_path: list[Node], value: float, to_play: int) -> None:
         """
         At the end of a simulation, we propagate the evaluation all the way up the tree
         to the root.

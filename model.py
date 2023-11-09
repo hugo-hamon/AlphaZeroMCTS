@@ -1,4 +1,5 @@
 import numpy as np
+import os
 
 import torch
 import torch.nn as nn
@@ -43,3 +44,12 @@ class Connect2Model(nn.Module):
             pi, v = self.forward(torch_board)
 
         return pi.data.cpu().numpy()[0], v.data.cpu().numpy()[0]
+    
+    def load_checkpoint(self, folder: str, filename: str) -> None:
+        """Load the model from a checkpoint file."""
+        filepath = os.path.join(folder, filename)
+        if not os.path.exists(filepath):
+            raise ValueError(f"No model in path {filepath}")
+
+        checkpoint = torch.load(filepath, map_location=self.device)
+        self.load_state_dict(checkpoint['state_dict'])
